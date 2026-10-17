@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>All Users — Appointy Admin</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<div class="app-layout">
+  <div class="main-content">
+
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+      <h2 class="page-title" style="margin:0">Registered Users</h2>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <select id="filter-role" onchange="filterUsers()"
+          style="padding:8px 14px; border:1.5px solid var(--gray-200); border-radius:99px; outline:none; font-size:13px; color:var(--gray-700); background:white;">
+          <option value="all">All Roles</option>
+          <option value="patient">Patients</option>
+          <option value="doctor">Doctors</option>
+          <option value="admin">Administrators</option>
+        </select>
+        <input type="text" id="search" placeholder="🔍 Search by name or email..."
+          style="padding:8px 16px; border:1.5px solid var(--gray-200); border-radius:99px; outline:none; width:260px; font-size:13px; background:white;"
+          oninput="filterUsers()">
+      </div>
+    </div>
+
+    <!-- Quick Stats for Users -->
+    <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom:20px;">
+      <div class="stat-card">
+        <div class="stat-icon purple">🧑‍🤝‍🧑</div>
+        <div class="stat-info">
+          <div class="stat-num" id="stat-total-patients">—</div>
+          <div class="stat-label">Total Patients</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon blue">👨‍⚕️</div>
+        <div class="stat-info">
+          <div class="stat-num" id="stat-total-doctors">—</div>
+          <div class="stat-label">Total Doctors</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon amber">🛡️</div>
+        <div class="stat-info">
+          <div class="stat-num" id="stat-total-admins">—</div>
+          <div class="stat-label">Administrators</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>User</th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th>Gender</th>
+              <th>Role</th>
+              <th>Registered On</th>
+            </tr>
+          </thead>
+          <tbody id="users-tbody">
+            <tr><td colspan="7"><div class="empty-state"><div class="es-icon">⏳</div><p>Loading users...</p></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="../js/utils.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+  renderLayout('admin');
+
+  let allUsers = [];
+
+  document.addEventListener('DOMContentLoaded', () => {
+    loadUsers();
+  });
+
+  async function loadUsers() {
+    try {
+      const data = await api('GET', '/api/admin/users');
+      if (!data.success) {
+        showToast(data.message || 'Failed to load users', 'error');
+        return;
+      }
+      allUsers = data.users || [];
+      updateUserStats(allUsers);
+      renderTable(allUsers);
+    } catch(e) {
+      showToast('Network error while loading users', 'error');
+    }
+  }
+
+  function updateUserStats(users) {
+    const patients = users.filter(u => u.role === 'patient').length;
+    const doctors = users.filter(u => u.role === 'doctor').length;
+    const admins = users.filter(u => u.role === 'admin').length;
+
+    document.getElementById('stat-total-patients').textContent = patients;
+    document.getElementById('stat-total-doctors').textContent = doctors;
+    document.getElementById('stat-total-admins').textContent = admins;
+  }
+
+  function renderTable(users) {
+    const tbody = document.getElementById('users-tbody');
+    if (!users.length) {
+      tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="es-icon">👥</div><p>No users found matching query</p></div></td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = users.map((u, i) => {
+      let roleBadge = '';
+      if (u.role === 'admin') {
+        roleBadge = `<span class="badge" style="background:#fee2e2; color:#991b1b; font-weight:700;">ADMIN</span>`;
+      } else if (u.role === 'doctor') {
+        roleBadge = `<span class="badge" style="background:#e0e7ff; color:#3730a3; font-weight:700;">DOCTOR</span>`;
+      } else {
+        roleBadge = `<span class="badge" style="background:#dcfce7; color:#166534; font-weight:700;">PATIENT</span>`;
+      }
+
+      return `
+        <tr>
+          <td>${i + 1}</td>
+          <td>
+            <div class="doc-avatar">
+              <div style="width:34px; height:34px; border-radius:50%; background:var(--primary-light); color:var(--primary); display:flex; align-items:center; justify-content:center; font-weight:700;">
+                ${(u.name || 'U')[0]}
+              </div>
+              <div class="doc-name">${u.name}</div>
+            </div>
+          </td>
+          <td>${u.email}</td>
+          <td>${u.phone || '—'}</td>
+          <td>${u.gender || '—'}</td>
+          <td>${roleBadge}</td>
+          <td>${formatDate(u.created_at)}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function filterUsers() {
+    const role = document.getElementById('filter-role').value;
+    const q = document.getElementById('search').value.toLowerCase().trim();
+
+    let filtered = allUsers;
+
+    if (role !== 'all') {
+      filtered = filtered.filter(u => u.role === role);
+    }
+
+    if (q) {
+      filtered = filtered.filter(u => 
+        (u.name && u.name.toLowerCase().includes(q)) ||
+        (u.email && u.email.toLowerCase().includes(q))
+      );
+    }
+
+    renderTable(filtered);
+  }
+</script>
+
+</body>
+</html>

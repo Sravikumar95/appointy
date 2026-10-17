@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Profile — Appointy Doctor</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<div class="app-layout">
+  <div class="main-content">
+
+    <h2 class="page-title">My Profile</h2>
+
+    <div class="profile-card">
+
+      <!-- Profile Header & Avatar Upload -->
+      <div class="profile-header" style="align-items:center;">
+        <div style="position:relative; width:88px; height:88px; cursor:pointer;" onclick="document.getElementById('photo-input').click()" title="Click to change profile photo">
+          <img id="prof-img" src="../assets/default-doc.png" alt="Doctor photo" style="width:100%; height:100%; border-radius:50%; object-fit:cover; border:3px solid var(--primary-light);">
+          <div style="position:absolute; bottom:0; right:0; background:var(--primary); color:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; font-size:13px; box-shadow:var(--shadow);">📷</div>
+        </div>
+        <input type="file" id="photo-input" accept="image/*" style="display:none" onchange="uploadDoctorPhoto(event)">
+
+        <div style="margin-left:8px;">
+          <h2 id="prof-name">Loading...</h2>
+          <p id="prof-spec" style="color:var(--primary); font-weight:600;"></p>
+          <p id="prof-degree" style="margin-top:2px; color:var(--gray-500); font-size:12px;"></p>
+        </div>
+
+        <div style="margin-left:auto; display:flex; gap:10px; align-items:center;">
+          <button class="btn-edit" id="btn-edit" onclick="enableEdit()">✏️ Edit Profile</button>
+          <button class="btn-save" id="btn-save" onclick="saveProfile()">Save Changes</button>
+          <button id="btn-cancel-edit" onclick="cancelEdit()"
+            style="display:none; background:none; border:none; color:var(--gray-500); cursor:pointer; font-size:13px;">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Availability Toggle -->
+      <div style="display:flex; align-items:center; gap:14px; margin-bottom:24px; padding:16px 20px; background:var(--gray-50); border-radius:var(--radius); border:1px solid var(--gray-200);">
+        <span style="font-size:14px; font-weight:600; color:var(--gray-700)">Accepting Appointments</span>
+        <button class="toggle" id="avail-toggle" onclick="toggleDoctorAvailability()"></button>
+        <span id="avail-text" style="font-size:13px; color:var(--gray-500)">Checking status...</span>
+      </div>
+
+      <!-- Editable Profile Fields -->
+      <div class="profile-fields">
+
+        <div class="field">
+          <label>Consultation Fees (₹) <span style="color:var(--danger)">*</span></label>
+          <input type="number" id="p-fees" disabled style="background:var(--gray-50)">
+        </div>
+
+        <div class="field">
+          <label>Experience</label>
+          <input type="text" id="p-experience" disabled style="background:var(--gray-50)" placeholder="e.g. 5 Years">
+        </div>
+
+        <div class="field">
+          <label>Specialization</label>
+          <input type="text" id="p-spec" disabled style="background:var(--gray-50)" placeholder="e.g. General physician">
+        </div>
+
+        <div class="field">
+          <label>Degree / Qualifications</label>
+          <input type="text" id="p-degree" disabled style="background:var(--gray-50)" placeholder="e.g. MBBS, MD">
+        </div>
+
+        <div class="field">
+          <label>Clinic Address Line 1</label>
+          <input type="text" id="p-addr1" disabled style="background:var(--gray-50)" placeholder="Street / Building">
+        </div>
+
+        <div class="field">
+          <label>Clinic Address Line 2</label>
+          <input type="text" id="p-addr2" disabled style="background:var(--gray-50)" placeholder="City, State">
+        </div>
+
+        <div class="field full">
+          <label>About Doctor Bio</label>
+          <textarea id="p-about" rows="4" disabled style="background:var(--gray-50)" placeholder="Share information about your background, expertise, and clinical care philosophy..."></textarea>
+        </div>
+
+      </div>
+
+      <!-- Info note -->
+      <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--gray-200); display:flex; justify-content:space-between; align-items:center;">
+        <p style="font-size:12px; color:var(--gray-400)">📧 Email address and legal name are managed by the System Administrator.</p>
+        <button class="btn-primary" style="padding:6px 14px; font-size:12px; background:var(--gray-100); color:var(--gray-700); border:1px solid var(--gray-200);" onclick="document.getElementById('photo-input').click()">Upload New Photo</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="../js/utils.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+  renderLayout('doctor');
+
+  let profileData = {};
+  let editMode = false;
+
+  document.addEventListener('DOMContentLoaded', () => {
+    loadProfile();
+  });
+
+  async function loadProfile() {
+    try {
+      const data = await api('GET', '/api/doctor/profile');
+      if (!data.success) {
+        showToast(data.message || 'Failed to load profile', 'error');
+        return;
+      }
+      profileData = data.profileData || data.doctor || {};
+      populateProfile();
+    } catch(e) {
+      showToast('Network error while loading profile', 'error');
+    }
+  }
+
+  function populateProfile() {
+    const d = profileData;
+    document.getElementById('prof-img').src = d.image || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400&auto=format&fit=crop&q=80';
+    document.getElementById('prof-name').textContent = d.name || 'Doctor';
+    document.getElementById('prof-spec').textContent = d.specialization || 'Specialist';
+    document.getElementById('prof-degree').textContent = `${d.degree || ''} ${d.experience ? '• ' + d.experience : ''}`;
+
+    document.getElementById('p-fees').value = d.fees || 500;
+    document.getElementById('p-experience').value = d.experience || '';
+    document.getElementById('p-spec').value = d.specialization || '';
+    document.getElementById('p-degree').value = d.degree || '';
+    document.getElementById('p-addr1').value = d.address_line1 || '';
+    document.getElementById('p-addr2').value = d.address_line2 || '';
+    document.getElementById('p-about').value = d.about || '';
+
+    // Availability toggle UI
+    const isAvail = Boolean(d.available);
+    const toggle = document.getElementById('avail-toggle');
+    const text = document.getElementById('avail-text');
+    toggle.classList.toggle('on', isAvail);
+    text.textContent = isAvail ? 'Available (Patients can book appointments)' : 'Unavailable (Booking slots closed)';
+    text.style.color = isAvail ? 'var(--success)' : 'var(--gray-400)';
+  }
+
+  function enableEdit() {
+    editMode = true;
+    document.getElementById('btn-edit').style.display = 'none';
+    document.getElementById('btn-save').style.display = 'inline-block';
+    document.getElementById('btn-cancel-edit').style.display = 'inline-block';
+
+    const inputs = ['p-fees', 'p-experience', 'p-spec', 'p-degree', 'p-addr1', 'p-addr2', 'p-about'];
+    inputs.forEach(id => {
+      const el = document.getElementById(id);
+      el.disabled = false;
+      el.style.background = 'var(--white)';
+      el.style.borderColor = 'var(--primary)';
+    });
+  }
+
+  function cancelEdit() {
+    editMode = false;
+    document.getElementById('btn-edit').style.display = 'inline-block';
+    document.getElementById('btn-save').style.display = 'none';
+    document.getElementById('btn-cancel-edit').style.display = 'none';
+
+    const inputs = ['p-fees', 'p-experience', 'p-spec', 'p-degree', 'p-addr1', 'p-addr2', 'p-about'];
+    inputs.forEach(id => {
+      const el = document.getElementById(id);
+      el.disabled = true;
+      el.style.background = 'var(--gray-50)';
+      el.style.borderColor = 'var(--gray-200)';
+    });
+
+    populateProfile();
+  }
+
+  async function saveProfile() {
+    const fees = document.getElementById('p-fees').value;
+    const experience = document.getElementById('p-experience').value.trim();
+    const specialization = document.getElementById('p-spec').value.trim();
+    const degree = document.getElementById('p-degree').value.trim();
+    const address_line1 = document.getElementById('p-addr1').value.trim();
+    const address_line2 = document.getElementById('p-addr2').value.trim();
+    const about = document.getElementById('p-about').value.trim();
+
+    if (!fees || isNaN(fees)) {
+      showToast('Please enter a valid consultation fee', 'error');
+      return;
+    }
+
+    const payload = {
+      fees: Number(fees),
+      experience,
+      specialization,
+      degree,
+      address_line1,
+      address_line2,
+      about
+    };
+
+    const res = await api('PUT', '/api/doctor/profile', payload);
+    if (res.success) {
+      showToast('Profile updated successfully!', 'success');
+      profileData = res.profileData || res.doctor;
+      cancelEdit();
+    } else {
+      showToast(res.message || 'Failed to update profile', 'error');
+    }
+  }
+
+  async function toggleDoctorAvailability() {
+    const res = await api('PUT', '/api/doctor/availability');
+    if (res.success) {
+      profileData.available = res.available ? 1 : 0;
+      const toggle = document.getElementById('avail-toggle');
+      const text = document.getElementById('avail-text');
+      toggle.classList.toggle('on', res.available);
+      text.textContent = res.available ? 'Available (Patients can book appointments)' : 'Unavailable (Booking slots closed)';
+      text.style.color = res.available ? 'var(--success)' : 'var(--gray-400)';
+      showToast(res.message || 'Availability updated');
+    } else {
+      showToast(res.message || 'Failed to update availability', 'error');
+    }
+  }
+
+  async function uploadDoctorPhoto(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showToast('Please upload an image file (JPG, PNG, WebP)', 'error');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('image', file);
+
+    showToast('Uploading profile photo...', 'success');
+
+    const res = await api('POST', '/api/doctor/profile/photo', formData, null, true);
+    if (res.success) {
+      showToast('Profile photo updated!', 'success');
+      document.getElementById('prof-img').src = res.image + '?t=' + Date.now();
+      profileData.image = res.image;
+    } else {
+      showToast(res.message || 'Failed to upload photo', 'error');
+    }
+  }
+</script>
+
+</body>
+</html>

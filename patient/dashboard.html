@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Patient Dashboard — Appointy</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<div class="app-layout">
+  <div class="main-content">
+
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; flex-wrap:wrap; gap:16px;">
+      <div>
+        <h2 class="page-title" style="margin:0" id="welcome-title">My Appointments</h2>
+        <p style="color:var(--gray-500); font-size:13px; margin-top:4px;">Manage your doctor visits, schedules, and past consultations</p>
+      </div>
+      <a href="../index.html">
+        <button class="btn-primary" style="padding:9px 20px; font-size:13px;">+ Book New Appointment</button>
+      </a>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom:24px;">
+      <div class="stat-card">
+        <div class="stat-icon blue">📋</div>
+        <div class="stat-info">
+          <div class="stat-num" id="stat-total">—</div>
+          <div class="stat-label">Total Bookings</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon green">✅</div>
+        <div class="stat-info">
+          <div class="stat-num" id="stat-active">—</div>
+          <div class="stat-label">Active / Upcoming</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon purple">🏥</div>
+        <div class="stat-info">
+          <div class="stat-num" id="stat-completed">—</div>
+          <div class="stat-label">Completed Visits</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Appointments Table Card -->
+    <div class="card">
+      <div class="card-header">
+        <h3>Appointment History</h3>
+        <input type="text" id="search-appt" placeholder="Search doctor or speciality..." 
+          style="padding:6px 14px; border:1px solid var(--gray-200); border-radius:99px; font-size:13px; outline:none;"
+          oninput="filterAppointments()">
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Doctor</th>
+              <th>Speciality</th>
+              <th>Date &amp; Time</th>
+              <th>Consultation Fee</th>
+              <th>Payment</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="patient-appts-tbody">
+            <tr>
+              <td colspan="8"><div class="empty-state"><div class="es-icon">⏳</div><p>Loading your appointments...</p></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="../js/utils.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+  renderLayout('patient');
+
+  let myAppointments = [];
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const user = getUser();
+    if (user.name) {
+      document.getElementById('welcome-title').textContent = `Welcome, ${user.name}`;
+    }
+    loadAppointments();
+  });
+
+  async function loadAppointments() {
+    const res = await api('GET', '/api/patient/appointments');
+    if (res.success) {
+      myAppointments = res.appointments || [];
+      updateStats(myAppointments);
+      renderTable(myAppointments);
+    } else {
+      showToast(res.message || 'Failed to load appointments', 'error');
+    }
+  }
+
+  function updateStats(appts) {
+    const total = appts.length;
+    const active = appts.filter(a => a.status === 'confirmed' || a.status === 'pending').length;
+    const completed = appts.filter(a => a.status === 'completed').length;
+
+    document.getElementById('stat-total').textContent = total;
+    document.getElementById('stat-active').textContent = active;
+    document.getElementById('stat-completed').textContent = completed;
+  }
+
+  function renderTable(list) {
+    const tbody = document.getElementById('patient-appts-tbody');
+    if (!list.length) {
+      tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="es-icon">📭</div><p>No appointments found. <a href="../index.html" style="color:var(--primary); font-weight:600;">Book one now</a>.</p></div></td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = list.map((a, i) => {
+      const canCancel = a.status === 'confirmed' || a.status === 'pending';
+      const docImg = a.doctor_image || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400&auto=format&fit=crop&q=80';
+
+      return `
+        <tr>
+          <td>${i + 1}</td>
+          <td>
+            <div class="doc-avatar">
+              <img src="${docImg}" alt="${a.doctor_name}" onerror="this.src='https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400&auto=format&fit=crop&q=80'">
+              <div class="doc-name">${a.doctor_name}</div>
+            </div>
+          </td>
+          <td>${a.specialization}</td>
+          <td>
+            ${formatDate(a.slot_date)}<br>
+            <span style="color:var(--gray-500); font-size:12px;">${a.slot_time}</span>
+          </td>
+          <td>${formatFee(a.amount)}</td>
+          <td>
+            <span class="badge badge-green">${a.payment_status === 'paid' ? 'Paid (Demo)' : 'Pending'}</span>
+          </td>
+          <td>
+            <span class="badge badge-${a.status}">${a.status.toUpperCase()}</span>
+          </td>
+          <td>
+            ${canCancel ? `
+              <button class="btn-cancel" onclick="cancelAppt(${a.id})" style="padding:5px 12px; font-size:12px;">Cancel</button>
+            ` : `<span style="color:var(--gray-400); font-size:12px;">—</span>`}
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function filterAppointments() {
+    const q = (document.getElementById('search-appt')?.value || '').toLowerCase().trim();
+    if (!q) {
+      renderTable(myAppointments);
+      return;
+    }
+    const filtered = myAppointments.filter(a => 
+      a.doctor_name.toLowerCase().includes(q) || 
+      a.specialization.toLowerCase().includes(q)
+    );
+    renderTable(filtered);
+  }
+
+  async function cancelAppt(id) {
+    if (!confirm('Are you sure you want to cancel this appointment?')) return;
+    const res = await api('PUT', `/api/patient/appointments/${id}/cancel`);
+    if (res.success) {
+      showToast('Appointment cancelled successfully.', 'success');
+      loadAppointments();
+    } else {
+      showToast(res.message || 'Failed to cancel appointment', 'error');
+    }
+  }
+</script>
+
+</body>
+</html>

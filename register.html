@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Appointy — Patient Registration</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="login-page">
+  <div class="login-card" style="max-width:480px;">
+
+    <div class="login-logo">
+      <h1 onclick="window.location.href='index.html'" style="cursor:pointer">Appointy</h1>
+      <p>Create a Patient Account</p>
+    </div>
+
+    <form id="reg-form" onsubmit="handleRegister(event)">
+      <div class="form-group">
+        <label>Full Name <span style="color:var(--danger)">*</span></label>
+        <input type="text" id="reg-name" placeholder="John Doe" required autocomplete="name">
+      </div>
+
+      <div class="form-group">
+        <label>Email Address <span style="color:var(--danger)">*</span></label>
+        <input type="email" id="reg-email" placeholder="patient@example.com" required autocomplete="email">
+      </div>
+
+      <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:16px;">
+        <div class="field">
+          <label style="display:block; font-size:13px; font-weight:500; margin-bottom:6px;">Phone Number</label>
+          <input type="tel" id="reg-phone" placeholder="+1 555-0199" style="width:100%; padding:10px; border:1px solid var(--gray-200); border-radius:6px;">
+        </div>
+        <div class="field">
+          <label style="display:block; font-size:13px; font-weight:500; margin-bottom:6px;">Gender</label>
+          <select id="reg-gender" style="width:100%; padding:10px; border:1px solid var(--gray-200); border-radius:6px;">
+            <option value="Not Selected">Select Gender</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Date of Birth</label>
+        <input type="date" id="reg-dob" style="width:100%; padding:10px; border:1px solid var(--gray-200); border-radius:6px;">
+      </div>
+
+      <div class="form-group">
+        <label>Password <span style="color:var(--danger)">*</span></label>
+        <input type="password" id="reg-password" placeholder="At least 6 characters" required autocomplete="new-password">
+      </div>
+
+      <button type="submit" class="btn-primary" id="btn-submit" style="margin-top:10px;">Create Account</button>
+    </form>
+
+    <p id="err-msg" style="color:var(--danger); font-size:13px; margin-top:14px; text-align:center; display:none;"></p>
+
+    <div style="text-align:center; margin-top:20px; font-size:13px; color:var(--gray-500);">
+      Already have an account? <a href="login.html?role=patient" style="color:var(--primary); font-weight:600;">Log in here</a>
+    </div>
+
+    <div style="text-align:center; margin-top:12px; font-size:12px;">
+      <a href="index.html" style="color:var(--gray-400);">← Back to Homepage</a>
+    </div>
+
+  </div>
+</div>
+
+<script src="js/utils.js"></script>
+<script>
+  // Redirect if already logged in
+  if (localStorage.getItem('pToken')) window.location.href = 'index.html';
+
+  async function handleRegister(e) {
+    e.preventDefault();
+    const name = document.getElementById('reg-name').value.trim();
+    const email = document.getElementById('reg-email').value.trim();
+    const phone = document.getElementById('reg-phone').value.trim();
+    const gender = document.getElementById('reg-gender').value;
+    const dob = document.getElementById('reg-dob').value;
+    const password = document.getElementById('reg-password').value;
+
+    const btn = document.getElementById('btn-submit');
+    btn.disabled = true;
+    btn.textContent = 'Creating account...';
+
+    const res = await api('POST', '/api/auth/register', {
+      name,
+      email,
+      phone,
+      gender,
+      dob,
+      password,
+      role: 'patient'
+    });
+
+    if (res.success) {
+      localStorage.setItem('pToken', res.token);
+      localStorage.setItem('currentUser', JSON.stringify(res.user));
+      showToast('Account created successfully! Welcome to Appointy.', 'success');
+      setTimeout(() => {
+        window.location.href = 'index.html';
+      }, 1000);
+    } else {
+      showError(res.message || 'Registration failed.');
+      btn.disabled = false;
+      btn.textContent = 'Create Account';
+    }
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('err-msg');
+    el.textContent = msg;
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 4000);
+  }
+</script>
+
+</body>
+</html>

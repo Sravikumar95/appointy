@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Appointy — Doctor Appointment Booking</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .booking-step { display: none; }
+    .booking-step.active { display: block; }
+    .date-pills { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; margin: 10px 0; }
+    .date-pill {
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1.5px solid var(--gray-200);
+      background: var(--white);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .date-pill.active {
+      background: var(--primary);
+      color: var(--white);
+      border-color: var(--primary);
+    }
+    .search-box-wrap {
+      max-width: 450px;
+      margin: 0 0 20px 0;
+      position: relative;
+    }
+    .search-input {
+      width: 100%;
+      padding: 10px 16px 10px 38px;
+      border-radius: 99px;
+      border: 1.5px solid var(--gray-200);
+      outline: none;
+      font-size: 14px;
+      background: var(--white);
+      transition: border-color 0.2s;
+    }
+    .search-input:focus { border-color: var(--primary); }
+    .search-icon { position: absolute; left: 14px; top: 11px; color: var(--gray-400); }
+  </style>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="patient-navbar">
+    <div class="brand-container" onclick="window.location.href='index.html'">
+      <div class="brand-logo-text">Appointy</div>
+    </div>
+    
+    <ul class="patient-nav-links">
+      <li><a href="index.html" class="active">Find Doctors</a></li>
+      <li><a href="javascript:void(0)" onclick="openMyAppointments()">My Appointments</a></li>
+    </ul>
+
+    <div class="patient-nav-actions" id="nav-actions">
+      <!-- Dynamic auth actions inserted by JS -->
+    </div>
+  </nav>
+
+  <!-- HERO SECTION -->
+  <section class="hero-section">
+    <div class="hero-content">
+      <h1>Book Appointments With Trusted Doctors</h1>
+      <p>Simply browse through our extensive list of trusted doctors, view verified profiles, pick a convenient time slot, and confirm your visit effortlessly.</p>
+      <button class="hero-btn" onclick="scrollToDoctors()">Find Doctors Now ↓</button>
+    </div>
+  </section>
+
+  <!-- SPECIALIZATION FILTER SECTION -->
+  <section class="category-filter-section" id="doctors-section">
+    <div style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:16px; margin-bottom:14px;">
+      <div>
+        <h2 class="section-title">Browse by Speciality</h2>
+        <div class="filter-pills" id="speciality-filters">
+          <button class="filter-pill active" onclick="setSpeciality('All')">All</button>
+          <button class="filter-pill" onclick="setSpeciality('General physician')">General Physician</button>
+          <button class="filter-pill" onclick="setSpeciality('Gynecologist')">Gynecologist</button>
+          <button class="filter-pill" onclick="setSpeciality('Dermatologist')">Dermatologist</button>
+          <button class="filter-pill" onclick="setSpeciality('Pediatricians')">Pediatricians</button>
+          <button class="filter-pill" onclick="setSpeciality('Neurologist')">Neurologist</button>
+          <button class="filter-pill" onclick="setSpeciality('Gastroenterologist')">Gastroenterologist</button>
+        </div>
+      </div>
+      <div class="search-box-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="doctor-search" class="search-input" placeholder="Search doctor by name..." oninput="handleSearch()">
+      </div>
+    </div>
+  </section>
+
+  <!-- DOCTORS GRID SECTION -->
+  <section class="doctors-section">
+    <div id="doctors-grid" class="doctors-grid-container">
+      <div style="grid-column:1/-1; text-align:center; padding:40px;">
+        <div class="empty-state">
+          <div class="es-icon">⏳</div>
+          <p>Loading doctors...</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BOOKING & PAYMENT MODAL -->
+  <div class="modal-overlay" id="booking-modal">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3 id="modal-title">Book Doctor Appointment</h3>
+        <button class="modal-close-btn" onclick="closeBookingModal()">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- STEP 1: SELECT DATE & TIME SLOT -->
+        <div class="booking-step active" id="step-slots">
+          <!-- Doctor Quick Summary -->
+          <div style="display:flex; gap:16px; align-items:center; margin-bottom:18px; padding-bottom:16px; border-bottom:1px solid var(--gray-200);">
+            <img id="m-doc-img" src="" alt="Doctor" style="width:68px; height:68px; border-radius:50%; object-fit:cover; border:2px solid var(--primary-light);">
+            <div>
+              <h4 id="m-doc-name" style="font-size:17px; font-weight:700; color:var(--gray-900);">Dr. Name</h4>
+              <p id="m-doc-spec" style="color:var(--primary); font-size:13px; font-weight:600;"></p>
+              <p id="m-doc-exp" style="color:var(--gray-500); font-size:12px;"></p>
+              <p id="m-doc-fee" style="color:var(--gray-800); font-size:13px; font-weight:600; margin-top:3px;"></p>
+            </div>
+          </div>
+
+          <!-- Doctor Bio -->
+          <div style="margin-bottom:16px;">
+            <label style="font-size:12px; font-weight:600; color:var(--gray-500); text-transform:uppercase;">About Doctor</label>
+            <p id="m-doc-about" style="font-size:13px; color:var(--gray-700); margin-top:4px; line-height:1.4;"></p>
+          </div>
+
+          <!-- Select Date -->
+          <div style="margin-bottom:16px;">
+            <label style="font-size:13px; font-weight:600; color:var(--gray-700); display:block;">Select Date</label>
+            <div class="date-pills" id="date-pills-container">
+              <!-- Inserted by JS -->
+            </div>
+          </div>
+
+          <!-- Select Slot -->
+          <div style="margin-bottom:18px;">
+            <label style="font-size:13px; font-weight:600; color:var(--gray-700); display:block;">Available Time Slots</label>
+            <div class="slots-grid" id="slots-grid-container">
+              <div style="grid-column:1/-1; text-align:center; padding:12px; color:var(--gray-400); font-size:13px;">Select a date to view slots</div>
+            </div>
+          </div>
+
+          <!-- Reason / Notes -->
+          <div class="form-group" style="margin-bottom:10px;">
+            <label style="font-size:13px; font-weight:500;">Symptoms or Consultation Reason (Optional)</label>
+            <textarea id="booking-notes" rows="2" placeholder="e.g. Fever, persistent cough for 3 days..." style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--gray-200); outline:none; font-size:13px; resize:vertical;"></textarea>
+          </div>
+        </div>
+
+        <!-- STEP 2: UI PAYMENT STEP (NO REAL GATEWAY) -->
+        <div class="booking-step" id="step-payment">
+          <div style="text-align:center; margin-bottom:16px;">
+            <div style="font-size:36px; margin-bottom:6px;">💳</div>
+            <h4 style="font-size:18px; font-weight:700;">Confirm &amp; Pay</h4>
+            <p style="font-size:12px; color:var(--gray-500);">Interactive payment checkout (Simulation mode)</p>
+          </div>
+
+          <div class="payment-summary-box">
+            <div class="payment-row">
+              <span style="color:var(--gray-500)">Doctor:</span>
+              <span id="pay-doc-name" style="font-weight:600;">—</span>
+            </div>
+            <div class="payment-row">
+              <span style="color:var(--gray-500)">Date &amp; Time:</span>
+              <span id="pay-datetime" style="font-weight:600;">—</span>
+            </div>
+            <div class="payment-row">
+              <span style="color:var(--gray-500)">Consultation Fee:</span>
+              <span id="pay-doc-fee" style="font-weight:600;">—</span>
+            </div>
+            <div class="payment-row">
+              <span style="color:var(--gray-500)">Platform Service Charge:</span>
+              <span style="color:var(--success); font-weight:600;">₹0 (Free)</span>
+            </div>
+            <div class="payment-row total">
+              <span>Total Payable Amount:</span>
+              <span id="pay-total-amount">₹0</span>
+            </div>
+          </div>
+
+          <label style="font-size:13px; font-weight:600; display:block; margin-bottom:8px;">Select Payment Method</label>
+          <div class="payment-options">
+            <label class="payment-radio-label selected">
+              <input type="radio" name="paymethod" value="upi" checked>
+              <div>
+                <div style="font-weight:600; font-size:13px;">UPI / QR (Google Pay, PhonePe, Paytm)</div>
+                <div style="font-size:11px; color:var(--gray-500);">Instant simulation checkout</div>
+              </div>
+            </label>
+            <label class="payment-radio-label">
+              <input type="radio" name="paymethod" value="card">
+              <div>
+                <div style="font-weight:600; font-size:13px;">Credit or Debit Card</div>
+                <div style="font-size:11px; color:var(--gray-500);">Visa, MasterCard, RuPay</div>
+              </div>
+            </label>
+            <label class="payment-radio-label">
+              <input type="radio" name="paymethod" value="cash">
+              <div>
+                <div style="font-weight:600; font-size:13px;">Pay at Clinic Counter</div>
+                <div style="font-size:11px; color:var(--gray-500);">Pay cash upon physical arrival</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-primary" id="btn-modal-back" style="display:none; background:var(--gray-100); color:var(--gray-700); border:1px solid var(--gray-200);" onclick="goToStep(1)">Back</button>
+        <button class="btn-primary" id="btn-modal-next" onclick="proceedToPayment()">Continue to Payment →</button>
+        <button class="btn-primary" id="btn-modal-pay" style="display:none; background:var(--success);" onclick="submitBookingAndPayment()">Pay &amp; Confirm Booking ✓</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MY APPOINTMENTS MODAL -->
+  <div class="modal-overlay" id="appointments-modal">
+    <div class="modal-container" style="max-width:700px;">
+      <div class="modal-header">
+        <h3>My Appointments</h3>
+        <button class="modal-close-btn" onclick="closeAppointmentsModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="my-appointments-body">
+        <div class="empty-state">
+          <div class="es-icon">⏳</div>
+          <p>Loading appointments...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/utils.js"></script>
+  <script>
+    let allDoctors = [];
+    let currentFilter = 'All';
+    let selectedDoctor = null;
+    let selectedDate = null;
+    let selectedSlot = null;
+    let currentStep = 1;
+
+    // Initialize Page
+    document.addEventListener('DOMContentLoaded', () => {
+      renderNav();
+      fetchDoctors();
+    });
+
+    function renderNav() {
+      const navActions = document.getElementById('nav-actions');
+      const pToken = localStorage.getItem('pToken');
+      const dToken = localStorage.getItem('dToken');
+      const aToken = localStorage.getItem('aToken');
+      const user = getUser();
+
+      if (pToken) {
+        navActions.innerHTML = `
+          <span style="font-weight:600; color:var(--gray-700); font-size:13px;">Hi, ${user.name || 'Patient'}</span>
+          <a href="patient/dashboard.html"><button class="btn-primary" style="padding:7px 14px; font-size:12px;">Dashboard</button></a>
+          <button class="btn-logout" style="padding:6px 14px; font-size:12px;" onclick="logout()">Logout</button>
+        `;
+      } else if (dToken) {
+        navActions.innerHTML = `
+          <a href="doctor/dashboard.html"><button class="btn-primary" style="padding:7px 14px; font-size:12px;">Doctor Panel</button></a>
+          <button class="btn-logout" style="padding:6px 14px; font-size:12px;" onclick="logout()">Logout</button>
+        `;
+      } else if (aToken) {
+        navActions.innerHTML = `
+          <a href="admin/dashboard.html"><button class="btn-primary" style="padding:7px 14px; font-size:12px;">Admin Panel</button></a>
+          <button class="btn-logout" style="padding:6px 14px; font-size:12px;" onclick="logout()">Logout</button>
+        `;
+      } else {
+        navActions.innerHTML = `
+          <a href="login.html?role=patient" style="font-size:13px; font-weight:600; color:var(--gray-700); margin-right:8px;">Sign In</a>
+          <a href="register.html"><button class="btn-primary" style="padding:7px 16px; font-size:13px;">Register</button></a>
+          <a href="login.html" style="margin-left:8px;"><button class="btn-userpanel" style="font-size:12px; padding:6px 12px;">Doctor / Admin</button></a>
+        `;
+      }
+    }
+
+    async function fetchDoctors() {
+      const res = await api('GET', '/api/patient/doctors');
+      if (res.success) {
+        allDoctors = res.doctors || [];
+        renderDoctorsGrid();
+      } else {
+        document.getElementById('doctors-grid').innerHTML = `
+          <div style="grid-column:1/-1; text-align:center; padding:40px;">
+            <div class="empty-state">
+              <div class="es-icon">⚠️</div>
+              <p>${res.message || 'Failed to load doctors'}</p>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    function setSpeciality(spec) {
+      currentFilter = spec;
+      document.querySelectorAll('#speciality-filters .filter-pill').forEach(btn => {
+        btn.classList.toggle('active', btn.textContent.trim().toLowerCase() === spec.toLowerCase() || (spec === 'All' && btn.textContent.trim() === 'All'));
+      });
+      renderDoctorsGrid();
+    }
+
+    function handleSearch() {
+      renderDoctorsGrid();
+    }
+
+    function renderDoctorsGrid() {
+      const grid = document.getElementById('doctors-grid');
+      const query = (document.getElementById('doctor-search')?.value || '').toLowerCase().trim();
+
+      let list = allDoctors;
+
+      if (currentFilter !== 'All') {
+        list = list.filter(d => d.specialization.toLowerCase() === currentFilter.toLowerCase());
+      }
+
+      if (query) {
+        list = list.filter(d => 
+          d.name.toLowerCase().includes(query) || 
+          d.specialization.toLowerCase().includes(query) ||
+          (d.about && d.about.toLowerCase().includes(query))
+        );
+      }
+
+      if (!list.length) {
+        grid.innerHTML = `
+          <div style="grid-column:1/-1; text-align:center; padding:40px;">
+            <div class="empty-state">
+              <div class="es-icon">👨‍⚕️</div>
+              <p>No doctors found matching your criteria.</p>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      grid.innerHTML = list.map(doc => {
+        const isAvail = Boolean(doc.available);
+        const img = doc.image || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400&auto=format&fit=crop&q=80';
+
+        return `
+          <div class="patient-doc-card">
+            <div class="doc-card-img-wrap">
+              <img src="${img}" alt="${doc.name}" onerror="this.src='https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400&auto=format&fit=crop&q=80'">
+              <div class="doc-avail-badge ${isAvail ? '' : 'off'}">
+                <span class="dot"></span>
+                <span>${isAvail ? 'Available' : 'Unavailable'}</span>
+              </div>
+            </div>
+            <div class="patient-doc-info">
+              <h3 class="patient-doc-name">${doc.name}</h3>
+              <div class="patient-doc-spec">${doc.specialization}</div>
+              <div class="patient-doc-meta">${doc.degree} • ${doc.experience}</div>
+              <div class="patient-doc-fee">
+                <span>${formatFee(doc.fees)} <span style="font-size:11px; font-weight:normal; color:var(--gray-500);">/ consultation</span></span>
+                <button class="btn-book" ${isAvail ? '' : 'disabled'} onclick="openBookingModal(${doc.id})">
+                  ${isAvail ? 'Book Appointment' : 'Unavailable'}
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function scrollToDoctors() {
+      document.getElementById('doctors-section').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // ── Booking Flow ──
+    async function openBookingModal(docId) {
+      const pToken = localStorage.getItem('pToken');
+      if (!pToken) {
+        showToast('Please log in as a Patient to book an appointment.', 'error');
+        setTimeout(() => {
+          window.location.href = 'login.html?role=patient';
+        }, 1200);
+        return;
+      }
+
+      selectedDoctor = allDoctors.find(d => d.id === docId);
+      if (!selectedDoctor) return;
+
+      // Reset state
+      selectedSlot = null;
+      document.getElementById('booking-notes').value = '';
+      goToStep(1);
+
+      // Populate doctor info in modal
+      document.getElementById('m-doc-img').src = selectedDoctor.image || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400&auto=format&fit=crop&q=80';
+      document.getElementById('m-doc-name').textContent = selectedDoctor.name;
+      document.getElementById('m-doc-spec').textContent = selectedDoctor.specialization;
+      document.getElementById('m-doc-exp').textContent = `${selectedDoctor.degree} • ${selectedDoctor.experience} experience`;
+      document.getElementById('m-doc-fee').textContent = `Consultation Fee: ${formatFee(selectedDoctor.fees)}`;
+      document.getElementById('m-doc-about').textContent = selectedDoctor.about || 'Specialist doctor offering comprehensive patient examinations and medical treatment.';
+
+      // Generate next 7 dates
+      buildDatePills();
+
+      document.getElementById('booking-modal').classList.add('open');
+    }
+
+    function closeBookingModal() {
+      document.getElementById('booking-modal').classList.remove('open');
+    }
+
+    function buildDatePills() {
+      const container = document.getElementById('date-pills-container');
+      const dates = [];
+
+      for (let i = 0; i < 7; i++) {
+        const d = new Date();
+        d.setDate(d.getDate() + i);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        const iso = `${yyyy}-${mm}-${dd}`;
+        
+        let label = d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
+        if (i === 0) label = `Today (${label})`;
+        else if (i === 1) label = `Tomorrow (${label})`;
+
+        dates.push({ iso, label });
+      }
+
+      container.innerHTML = dates.map((item, idx) => `
+        <button class="date-pill ${idx === 0 ? 'active' : ''}" onclick="selectDate('${item.iso}', this)">${item.label}</button>
+      `).join('');
+
+      // Auto-select first date
+      selectDate(dates[0].iso, container.children[0]);
+    }
+
+    async function selectDate(dateIso, btnElement) {
+      selectedDate = dateIso;
+      selectedSlot = null;
+
+      document.querySelectorAll('#date-pills-container .date-pill').forEach(b => b.classList.remove('active'));
+      if (btnElement) btnElement.classList.add('active');
+
+      const slotsGrid = document.getElementById('slots-grid-container');
+      slotsGrid.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:12px; color:var(--gray-500); font-size:13px;">Checking available slots...</div>`;
+
+      const res = await api('GET', `/api/patient/doctors/${selectedDoctor.id}/slots?date=${dateIso}`);
+      if (res.success) {
+        renderSlots(res.slots || []);
+      } else {
+        slotsGrid.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:12px; color:var(--danger); font-size:13px;">${res.message || 'Could not fetch slots'}</div>`;
+      }
+    }
+
+    function renderSlots(slots) {
+      const container = document.getElementById('slots-grid-container');
+      if (!slots.length) {
+        container.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:12px; color:var(--gray-400);">No slots available</div>`;
+        return;
+      }
+
+      container.innerHTML = slots.map(s => `
+        <button class="slot-btn" ${s.available ? '' : 'disabled'} onclick="pickSlot('${s.time}', this)">
+          ${s.time}
+        </button>
+      `).join('');
+    }
+
+    function pickSlot(time, element) {
+      selectedSlot = time;
+      document.querySelectorAll('#slots-grid-container .slot-btn').forEach(b => b.classList.remove('selected'));
+      element.classList.add('selected');
+    }
+
+    function goToStep(step) {
+      currentStep = step;
+      document.getElementById('step-slots').classList.toggle('active', step === 1);
+      document.getElementById('step-payment').classList.toggle('active', step === 2);
+
+      const btnBack = document.getElementById('btn-modal-back');
+      const btnNext = document.getElementById('btn-modal-next');
+      const btnPay  = document.getElementById('btn-modal-pay');
+
+      if (step === 1) {
+        btnBack.style.display = 'none';
+        btnNext.style.display = 'inline-block';
+        btnPay.style.display = 'none';
+        document.getElementById('modal-title').textContent = 'Book Doctor Appointment';
+      } else {
+        btnBack.style.display = 'inline-block';
+        btnNext.style.display = 'none';
+        btnPay.style.display = 'inline-block';
+        document.getElementById('modal-title').textContent = 'Payment Step (Demo UI)';
+      }
+    }
+
+    function proceedToPayment() {
+      if (!selectedDate) {
+        showToast('Please choose an appointment date.', 'error');
+        return;
+      }
+      if (!selectedSlot) {
+        showToast('Please select a time slot.', 'error');
+        return;
+      }
+
+      // Populate summary
+      document.getElementById('pay-doc-name').textContent = selectedDoctor.name;
+      document.getElementById('pay-datetime').textContent = `${formatDate(selectedDate)} at ${selectedSlot}`;
+      document.getElementById('pay-doc-fee').textContent = formatFee(selectedDoctor.fees);
+      document.getElementById('pay-total-amount').textContent = formatFee(selectedDoctor.fees);
+
+      goToStep(2);
+    }
+
+    async function submitBookingAndPayment() {
+      const notes = document.getElementById('booking-notes').value.trim();
+      const btnPay = document.getElementById('btn-modal-pay');
+      btnPay.disabled = true;
+      btnPay.textContent = 'Processing Payment...';
+
+      try {
+        const payload = {
+          doctorId: selectedDoctor.id,
+          slotDate: selectedDate,
+          slotTime: selectedSlot,
+          notes
+        };
+
+        const res = await api('POST', '/api/patient/appointments', payload);
+        if (res.success) {
+          showToast('Payment successful! Your appointment is confirmed.', 'success');
+          closeBookingModal();
+          setTimeout(() => {
+            openMyAppointments();
+          }, 600);
+        } else {
+          showToast(res.message || 'Booking failed.', 'error');
+        }
+      } catch (err) {
+        showToast('Error processing booking request.', 'error');
+      } finally {
+        btnPay.disabled = false;
+        btnPay.textContent = 'Pay & Confirm Booking ✓';
+      }
+    }
+
+    // ── My Appointments Modal ──
+    async function openMyAppointments() {
+      const pToken = localStorage.getItem('pToken');
+      if (!pToken) {
+        showToast('Please log in as a Patient to view your appointments.', 'error');
+        setTimeout(() => { window.location.href = 'login.html?role=patient'; }, 1000);
+        return;
+      }
+
+      document.getElementById('appointments-modal').classList.add('open');
+      const body = document.getElementById('my-appointments-body');
+      body.innerHTML = `<div class="empty-state"><div class="es-icon">⏳</div><p>Fetching appointments...</p></div>`;
+
+      const res = await api('GET', '/api/patient/appointments');
+      if (res.success) {
+        renderMyAppointmentsList(res.appointments || []);
+      } else {
+        body.innerHTML = `<div class="empty-state"><div class="es-icon">⚠️</div><p>${res.message || 'Error loading appointments'}</p></div>`;
+      }
+    }
+
+    function closeAppointmentsModal() {
+      document.getElementById('appointments-modal').classList.remove('open');
+    }
+
+    function renderMyAppointmentsList(list) {
+      const body = document.getElementById('my-appointments-body');
+      if (!list.length) {
+        body.innerHTML = `
+          <div class="empty-state">
+            <div class="es-icon">📋</div>
+            <p>You have no appointments booked yet.</p>
+          </div>
+        `;
+        return;
+      }
+
+      body.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:14px;">
+          ${list.map(a => `
+            <div style="border:1px solid var(--gray-200); border-radius:10px; padding:16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+              <div style="display:flex; gap:14px; align-items:center;">
+                <img src="${a.doctor_image || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400&auto=format&fit=crop&q=80'}" style="width:52px; height:52px; border-radius:50%; object-fit:cover;">
+                <div>
+                  <h4 style="font-size:15px; font-weight:700;">${a.doctor_name}</h4>
+                  <div style="color:var(--primary); font-size:12px; font-weight:600;">${a.specialization}</div>
+                  <div style="color:var(--gray-500); font-size:12px; margin-top:2px;">
+                    📅 ${formatDate(a.slot_date)} &nbsp;|&nbsp; ⏰ ${a.slot_time}
+                  </div>
+                  <div style="font-size:12px; font-weight:600; margin-top:3px;">
+                    Fee: ${formatFee(a.amount)} • <span class="badge badge-green" style="font-size:11px;">Paid (Demo)</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
+                <span class="badge badge-${a.status}">${a.status.toUpperCase()}</span>
+                ${(a.status !== 'cancelled' && a.status !== 'completed') ? `
+                  <button class="btn-cancel" onclick="cancelMyAppointment(${a.id})" style="padding:4px 12px; font-size:12px;">Cancel</button>
+                ` : ''}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    async function cancelMyAppointment(appointmentId) {
+      if (!confirm('Are you sure you want to cancel this appointment?')) return;
+
+      const res = await api('PUT', `/api/patient/appointments/${appointmentId}/cancel`);
+      if (res.success) {
+        showToast('Appointment cancelled successfully.', 'success');
+        openMyAppointments();
+      } else {
+        showToast(res.message || 'Failed to cancel appointment', 'error');
+      }
+    }
+  </script>
+</body>
+</html>

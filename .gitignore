@@ -1,0 +1,7 @@
+node_modules/
+.env
+uploads/doctors/*
+!uploads/doctors/.gitkeep
+.DS_Store
+*.log
+npm-debug.log*

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doctors List — Appointy Admin</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<div class="app-layout">
+  <div class="main-content">
+
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+      <h2 class="page-title" style="margin:0">Manage Doctors</h2>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <input type="text" id="search" placeholder="🔍 Search doctor or speciality..."
+          style="padding:8px 14px; border:1.5px solid var(--gray-200); border-radius:99px; outline:none; width:260px; font-size:13px; background:white;"
+          oninput="filterDoctors()">
+        <a href="add-doctor.html">
+          <button class="btn-primary" style="margin:0; padding:8px 18px; font-size:13px;">+ Add Doctor</button>
+        </a>
+      </div>
+    </div>
+
+    <div id="doctors-grid" class="doctors-grid">
+      <div style="grid-column:1/-1"><div class="empty-state"><div class="es-icon">⏳</div><p>Loading doctors...</p></div></div>
+    </div>
+
+  </div>
+</div>
+
+<script src="../js/utils.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+  renderLayout('admin');
+
+  let allDoctors = [];
+
+  document.addEventListener('DOMContentLoaded', () => {
+    loadDoctors();
+  });
+
+  async function loadDoctors() {
+    try {
+      const data = await api('GET', '/api/admin/doctors');
+      if (!data.success) {
+        showToast(data.message || 'Failed to load doctors', 'error');
+        return;
+      }
+      allDoctors = data.doctors || [];
+      renderGrid(allDoctors);
+    } catch(e) {
+      showToast('Network error loading doctors', 'error');
+    }
+  }
+
+  function renderGrid(doctors) {
+    const grid = document.getElementById('doctors-grid');
+    if (!doctors.length) {
+      grid.innerHTML = `<div style="grid-column:1/-1"><div class="empty-state"><div class="es-icon">👨‍⚕️</div><p>No doctors found. <a href="add-doctor.html" style="color:var(--primary)">Add a new doctor</a>.</p></div></div>`;
+      return;
+    }
+
+    grid.innerHTML = doctors.map(doc => {
+      const isApproved = Boolean(doc.is_approved);
+      const isAvail = Boolean(doc.available);
+      const photo = doc.image || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400&auto=format&fit=crop&q=80';
+
+      return `
+        <div class="doctor-card" id="card-${doc.id}" style="display:flex; flex-direction:column;">
+          <img src="${photo}" alt="${doc.name}" onerror="this.src='https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400&auto=format&fit=crop&q=80'">
+          <div class="dc-name">${doc.name}</div>
+          <div class="dc-spec">${doc.specialization || doc.speciality}</div>
+          <div class="dc-fee">${formatFee(doc.fees)} / visit</div>
+          <div style="font-size:11px; color:var(--gray-400); margin-top:4px;">${doc.experience} • ${doc.degree}</div>
+          
+          <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center; font-size:12px;">
+            <span style="font-weight:600; color:${isApproved ? 'var(--success)' : 'var(--danger)'};">
+              ${isApproved ? '✓ Approved' : '⏳ Pending'}
+            </span>
+            <button class="btn-primary" style="padding:3px 10px; font-size:11px; background:${isApproved ? 'var(--gray-500)' : 'var(--success)'};" onclick="toggleApproval(${doc.id}, ${doc.is_approved})">
+              ${isApproved ? 'Revoke' : 'Approve'}
+            </button>
+          </div>
+
+          <div class="toggle-avail" style="margin-top:10px;">
+            <button class="toggle ${isAvail ? 'on' : ''}" id="toggle-${doc.id}"
+              onclick="toggleAvail(${doc.id}, ${doc.available})" title="${isAvail ? 'Available' : 'Unavailable'}">
+            </button>
+            <span id="avail-label-${doc.id}" style="color:${isAvail ? 'var(--success)' : 'var(--gray-400)'}">
+              ${isAvail ? 'Available' : 'Unavailable'}
+            </span>
+
+            <button onclick="deleteDoctor(${doc.id}, '${doc.name.replace(/'/g, "\\'")}')" 
+              style="margin-left:auto; background:none; border:none; color:var(--danger); font-size:12px; cursor:pointer;" title="Delete Doctor">
+              🗑️ Delete
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  async function toggleAvail(docId, current) {
+    const data = await api('POST', '/api/admin/change-availability', { docId });
+    if (data.success) {
+      showToast(data.message || 'Availability updated');
+      loadDoctors();
+    } else {
+      showToast(data.message || 'Failed', 'error');
+    }
+  }
+
+  async function toggleApproval(docId, currentApproved) {
+    const targetStatus = !currentApproved;
+    const data = await api('PUT', `/api/admin/doctors/${docId}/approval`, { is_approved: targetStatus });
+    if (data.success) {
+      showToast(data.message || 'Approval status updated', 'success');
+      loadDoctors();
+    } else {
+      showToast(data.message || 'Failed', 'error');
+    }
+  }
+
+  async function deleteDoctor(docId, docName) {
+    if (!confirm(`Are you sure you want to permanently delete ${docName}? This will remove the doctor account and all their appointments.`)) return;
+
+    const data = await api('DELETE', `/api/admin/doctors/${docId}`);
+    if (data.success) {
+      showToast('Doctor deleted successfully', 'success');
+      loadDoctors();
+    } else {
+      showToast(data.message || 'Failed to delete doctor', 'error');
+    }
+  }
+
+  function filterDoctors() {
+    const q = document.getElementById('search').value.toLowerCase().trim();
+    if (!q) { renderGrid(allDoctors); return; }
+    renderGrid(allDoctors.filter(d =>
+      d.name.toLowerCase().includes(q) || 
+      (d.specialization && d.specialization.toLowerCase().includes(q))
+    ));
+  }
+</script>
+
+</body>
+</html>

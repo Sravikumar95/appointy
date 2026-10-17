@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — Appointy Admin</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<div class="app-layout">
+  <div class="main-content">
+
+    <h2 class="page-title">Admin Overview</h2>
+
+    <!-- Stat Cards -->
+    <div class="stats-grid" id="stats-grid" style="grid-template-columns: repeat(4, 1fr);">
+      <div class="stat-card">
+        <div class="stat-icon blue">👨‍⚕️</div>
+        <div class="stat-info">
+          <div class="stat-num" id="stat-doctors">—</div>
+          <div class="stat-label">Total Doctors</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon green">📋</div>
+        <div class="stat-info">
+          <div class="stat-num" id="stat-appointments">—</div>
+          <div class="stat-label">Total Appointments</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon purple">🧑‍🤝‍🧑</div>
+        <div class="stat-info">
+          <div class="stat-num" id="stat-patients">—</div>
+          <div class="stat-label">Registered Patients</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon amber">💳</div>
+        <div class="stat-info">
+          <div class="stat-num" id="stat-revenue">—</div>
+          <div class="stat-label">Platform Volume</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Latest Appointments -->
+    <div class="card">
+      <div class="card-header">
+        <h3>Latest Appointments</h3>
+        <a href="appointments.html" style="font-size:13px; color:var(--primary); font-weight:600;">View all appointments →</a>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Patient</th>
+              <th>Doctor</th>
+              <th>Date &amp; Time</th>
+              <th>Fees</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="appt-tbody">
+            <tr><td colspan="7"><div class="empty-state"><div class="es-icon">⏳</div><p>Loading appointments...</p></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="../js/utils.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+  renderLayout('admin');
+
+  document.addEventListener('DOMContentLoaded', () => {
+    loadDashboard();
+  });
+
+  async function loadDashboard() {
+    try {
+      const data = await api('GET', '/api/admin/dashboard');
+      if (!data.success) {
+        showToast(data.message || 'Failed to load dashboard', 'error');
+        return;
+      }
+
+      const d = data.dashData || {};
+      document.getElementById('stat-doctors').textContent      = d.doctors      ?? 0;
+      document.getElementById('stat-appointments').textContent = d.appointments ?? 0;
+      document.getElementById('stat-patients').textContent     = d.patients     ?? 0;
+      document.getElementById('stat-revenue').textContent      = formatFee(d.revenue || 0);
+
+      const tbody = document.getElementById('appt-tbody');
+      const appts = d.latestAppointments || [];
+
+      if (!appts.length) {
+        tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="es-icon">📭</div><p>No appointments yet</p></div></td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = appts.map((a, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td>
+            <div class="doc-avatar">
+              <div style="width:34px; height:34px; border-radius:50%; background:var(--primary-light); color:var(--primary); display:flex; align-items:center; justify-content:center; font-weight:700;">
+                ${(a.userData?.name || 'P')[0]}
+              </div>
+              <div class="doc-name">${a.userData?.name || '—'}</div>
+            </div>
+          </td>
+          <td>
+            <div class="doc-avatar">
+              <img src="${a.docData?.image || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400&auto=format&fit=crop&q=80'}" alt="">
+              <div>
+                <div class="doc-name">${a.docData?.name || '—'}</div>
+                <div style="font-size:11px; color:var(--gray-500);">${a.docData?.speciality || ''}</div>
+              </div>
+            </div>
+          </td>
+          <td>
+            ${formatDate(a.slotDate)}<br>
+            <span style="color:var(--gray-500); font-size:12px;">${a.slotTime || ''}</span>
+          </td>
+          <td>${formatFee(a.amount)}</td>
+          <td>
+            <span class="badge badge-${a.status}">${a.status.toUpperCase()}</span>
+          </td>
+          <td>
+            ${a.status !== 'cancelled' ? `
+              <button class="btn-cancel" onclick="cancelAppt(${a.id})" style="padding:4px 10px; font-size:11px;">Cancel</button>
+            ` : `<span style="color:var(--gray-400); font-size:12px;">Cancelled</span>`}
+          </td>
+        </tr>
+      `).join('');
+    } catch (e) {
+      showToast('Cannot connect to server', 'error');
+    }
+  }
+
+  async function cancelAppt(id) {
+    if (!confirm('Cancel this appointment as Administrator?')) return;
+    const res = await api('PUT', `/api/admin/appointments/${id}/cancel`);
+    if (res.success) {
+      showToast('Appointment cancelled successfully.', 'success');
+      loadDashboard();
+    } else {
+      showToast(res.message || 'Action failed', 'error');
+    }
+  }
+</script>
+
+</body>
+</html>

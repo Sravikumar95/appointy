@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doctor Dashboard — Appointy</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<div class="app-layout">
+  <div class="main-content">
+
+    <h2 class="page-title">Doctor Dashboard</h2>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon amber">💰</div>
+        <div class="stat-info">
+          <div class="stat-num" id="stat-earnings">—</div>
+          <div class="stat-label">Total Earnings</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon blue">📋</div>
+        <div class="stat-info">
+          <div class="stat-num" id="stat-appointments">—</div>
+          <div class="stat-label">Total Appointments</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon purple">🧑‍🤝‍🧑</div>
+        <div class="stat-info">
+          <div class="stat-num" id="stat-patients">—</div>
+          <div class="stat-label">Unique Patients</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Latest Appointments -->
+    <div class="card">
+      <div class="card-header">
+        <h3>Recent Appointments</h3>
+        <a href="appointments.html" style="font-size:13px; color:var(--primary); font-weight:600;">View all appointments →</a>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Patient</th>
+              <th>Age / Gender</th>
+              <th>Date &amp; Time</th>
+              <th>Consultation Fee</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="appt-tbody">
+            <tr><td colspan="7"><div class="empty-state"><div class="es-icon">⏳</div><p>Loading dashboard...</p></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="../js/utils.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+  renderLayout('doctor');
+
+  document.addEventListener('DOMContentLoaded', () => {
+    loadDashboard();
+  });
+
+  async function loadDashboard() {
+    try {
+      const data = await api('GET', '/api/doctor/dashboard');
+      if (!data.success) {
+        showToast(data.message || 'Failed to load dashboard', 'error');
+        return;
+      }
+
+      const d = data.dashData || {};
+      document.getElementById('stat-earnings').textContent     = formatFee(d.earnings || 0);
+      document.getElementById('stat-appointments').textContent = d.appointments || 0;
+      document.getElementById('stat-patients').textContent     = d.patients || 0;
+
+      const tbody = document.getElementById('appt-tbody');
+      const appts = d.latestAppointments || [];
+
+      if (!appts.length) {
+        tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="es-icon">📭</div><p>No appointments booked yet</p></div></td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = appts.map((a, i) => {
+        const p = a.userData || {};
+        let actions = '';
+        if (a.status === 'pending') {
+          actions = `
+            <button class="btn-primary" style="padding:4px 10px; font-size:11px; background:var(--success); margin-right:4px;" onclick="changeStatus(${a.id}, 'confirmed')">Confirm</button>
+            <button class="btn-cancel" style="padding:4px 10px; font-size:11px;" onclick="changeStatus(${a.id}, 'cancelled')">Reject</button>
+          `;
+        } else if (a.status === 'confirmed') {
+          actions = `<button class="btn-primary" style="padding:4px 10px; font-size:11px; background:var(--primary);" onclick="changeStatus(${a.id}, 'completed')">Complete</button>`;
+        } else {
+          actions = `<span style="color:var(--gray-400); font-size:12px;">Completed</span>`;
+        }
+
+        return `
+          <tr>
+            <td>${i + 1}</td>
+            <td>
+              <div class="doc-avatar">
+                <div style="width:36px; height:36px; border-radius:50%; background:var(--primary-light); color:var(--primary); display:flex; align-items:center; justify-content:center; font-weight:700;">
+                  ${(p.name || 'P')[0]}
+                </div>
+                <div class="doc-name">${p.name || 'Anonymous'}</div>
+              </div>
+            </td>
+            <td>
+              ${calcAge(p.dob)} yrs<br>
+              <span style="color:var(--gray-500); font-size:12px">${p.gender || '—'}</span>
+            </td>
+            <td>
+              ${formatDate(a.slotDate)}<br>
+              <span style="color:var(--gray-500); font-size:12px">${a.slotTime || ''}</span>
+            </td>
+            <td>${formatFee(a.amount)}</td>
+            <td>
+              <span class="badge badge-${a.status}">${a.status.toUpperCase()}</span>
+            </td>
+            <td>${actions}</td>
+          </tr>
+        `;
+      }).join('');
+    } catch(e) {
+      showToast('Error loading doctor dashboard', 'error');
+    }
+  }
+
+  async function changeStatus(appointmentId, status) {
+    const res = await api('PUT', `/api/doctor/appointments/${appointmentId}/status`, { status });
+    if (res.success) {
+      showToast('Status updated', 'success');
+      loadDashboard();
+    } else {
+      showToast(res.message || 'Action failed', 'error');
+    }
+  }
+</script>
+
+</body>
+</html>

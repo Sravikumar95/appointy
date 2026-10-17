@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Appointy — Login</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .login-toggle button {
+      font-size: 13px;
+      padding: 7px 4px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="login-page">
+  <div class="login-card">
+
+    <div class="login-logo">
+      <h1 onclick="window.location.href='index.html'" style="cursor:pointer">Appointy</h1>
+      <p id="portal-subheading">Patient, Doctor &amp; Admin Portal</p>
+    </div>
+
+    <!-- Toggle: Patient / Doctor / Admin -->
+    <div class="login-toggle">
+      <button id="btn-patient" class="active" onclick="setRole('patient')">Patient</button>
+      <button id="btn-doctor" onclick="setRole('doctor')">Doctor</button>
+      <button id="btn-admin" onclick="setRole('admin')">Admin</button>
+    </div>
+
+    <form onsubmit="handleLogin(event)">
+      <div class="form-group">
+        <label>Email address</label>
+        <input type="email" id="email" placeholder="Enter your email" required autocomplete="email">
+      </div>
+
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="password" placeholder="Enter your password" required autocomplete="current-password">
+      </div>
+
+      <button type="submit" class="btn-primary" id="login-submit-btn">Login</button>
+    </form>
+
+    <p id="err-msg" style="color:#ef4444;font-size:13px;margin-top:12px;text-align:center;display:none"></p>
+
+    <!-- Patient register link -->
+    <div id="patient-reg-link" style="text-align:center;margin-top:20px;font-size:13px;color:var(--gray-500)">
+      Don't have an account? <a href="register.html" style="color:var(--primary);font-weight:600">Register as Patient</a>
+    </div>
+
+    <!-- Demo helper credentials -->
+    <div style="margin-top:24px;padding:12px;background:var(--gray-50);border-radius:6px;border:1px solid var(--gray-200);font-size:11px;color:var(--gray-500)">
+      <div style="font-weight:600;margin-bottom:4px;color:var(--gray-700)">Quick Demo Credentials:</div>
+      <div id="demo-creds">
+        Patient: <code>patient@appointy.com</code> / <code>Patient@123</code>
+      </div>
+    </div>
+
+    <div style="text-align:center;margin-top:16px;font-size:12px;">
+      <a href="index.html" style="color:var(--gray-400);">← Back to Homepage</a>
+    </div>
+
+  </div>
+</div>
+
+<script src="js/utils.js"></script>
+<script>
+  let role = 'patient';
+
+  // Read URL query param ?role=patient|doctor|admin
+  const params = new URLSearchParams(window.location.search);
+  const qRole = params.get('role');
+  if (qRole && ['patient', 'doctor', 'admin'].includes(qRole)) {
+    role = qRole;
+  }
+
+  // Redirect if already logged in for that specific role
+  if (role === 'patient' && localStorage.getItem('pToken')) window.location.href = 'index.html';
+  if (role === 'doctor' && localStorage.getItem('dToken')) window.location.href = 'doctor/dashboard.html';
+  if (role === 'admin' && localStorage.getItem('aToken')) window.location.href = 'admin/dashboard.html';
+
+  function updateActiveRoleUI() {
+    document.getElementById('btn-patient').classList.toggle('active', role === 'patient');
+    document.getElementById('btn-doctor').classList.toggle('active', role === 'doctor');
+    document.getElementById('btn-admin').classList.toggle('active', role === 'admin');
+
+    const sub = document.getElementById('portal-subheading');
+    const demo = document.getElementById('demo-creds');
+    const regLink = document.getElementById('patient-reg-link');
+
+    if (role === 'patient') {
+      sub.textContent = 'Patient Portal';
+      demo.innerHTML = `Patient: <code>patient@appointy.com</code> / <code>Patient@123</code>`;
+      regLink.style.display = 'block';
+    } else if (role === 'doctor') {
+      sub.textContent = 'Doctor Portal';
+      demo.innerHTML = `Doctor: <code>richard@appointy.com</code> / <code>Doctor@123</code>`;
+      regLink.style.display = 'none';
+    } else {
+      sub.textContent = 'Administrator Portal';
+      demo.innerHTML = `Admin: <code>admin@appointy.com</code> / <code>Admin@123</code>`;
+      regLink.style.display = 'none';
+    }
+  }
+
+  function setRole(r) {
+    role = r;
+    updateActiveRoleUI();
+  }
+
+  // Initial UI sync
+  updateActiveRoleUI();
+
+  async function handleLogin(e) {
+    e.preventDefault();
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const btn = document.getElementById('login-submit-btn');
+
+    if (!email || !password) {
+      showErr('Please enter email and password');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Authenticating...';
+
+    const res = await api('POST', '/api/auth/login', { email, password, role });
+
+    if (res.success) {
+      localStorage.setItem('currentUser', JSON.stringify(res.user));
+
+      if (role === 'admin') {
+        localStorage.setItem('aToken', res.token);
+        window.location.href = 'admin/dashboard.html';
+      } else if (role === 'doctor') {
+        localStorage.setItem('dToken', res.token);
+        window.location.href = 'doctor/dashboard.html';
+      } else {
+        localStorage.setItem('pToken', res.token);
+        window.location.href = 'index.html';
+      }
+    } else {
+      showErr(res.message || 'Invalid credentials');
+      btn.disabled = false;
+      btn.textContent = 'Login';
+    }
+  }
+
+  function showErr(msg) {
+    const el = document.getElementById('err-msg');
+    el.textContent = msg;
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 4000);
+  }
+</script>
+
+</body>
+</html>

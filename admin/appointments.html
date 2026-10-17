@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>All Appointments — Appointy Admin</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<div class="app-layout">
+  <div class="main-content">
+
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+      <h2 class="page-title" style="margin:0">System Appointments</h2>
+      <input type="text" id="search" placeholder="🔍 Search patient, doctor, or status..." 
+        style="padding:8px 16px; border:1.5px solid var(--gray-200); border-radius:99px; outline:none; width:280px; font-size:13px; background:white;"
+        oninput="filterTable()">
+    </div>
+
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Patient</th>
+              <th>Doctor</th>
+              <th>Speciality</th>
+              <th>Date &amp; Time</th>
+              <th>Fee</th>
+              <th>Payment</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="appt-tbody">
+            <tr><td colspan="9"><div class="empty-state"><div class="es-icon">⏳</div><p>Loading appointments...</p></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="../js/utils.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+  renderLayout('admin');
+
+  let allAppts = [];
+
+  document.addEventListener('DOMContentLoaded', () => {
+    loadAppointments();
+  });
+
+  async function loadAppointments() {
+    try {
+      const data = await api('GET', '/api/admin/appointments');
+      if (!data.success) {
+        showToast(data.message || 'Failed to load appointments', 'error');
+        return;
+      }
+      allAppts = data.appointments || [];
+      renderTable(allAppts);
+    } catch(e) {
+      showToast('Network error while loading appointments', 'error');
+    }
+  }
+
+  function renderTable(appts) {
+    const tbody = document.getElementById('appt-tbody');
+    if (!appts.length) {
+      tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="es-icon">📭</div><p>No appointments found</p></div></td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = appts.map((a, i) => {
+      const docImg = a.docData?.image || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400&auto=format&fit=crop&q=80';
+      const patientName = a.userData?.name || 'Anonymous';
+      const doctorName = a.docData?.name || 'Doctor';
+
+      return `
+        <tr>
+          <td>${i + 1}</td>
+          <td>
+            <div class="doc-avatar">
+              <div style="width:34px; height:34px; border-radius:50%; background:var(--primary-light); color:var(--primary); display:flex; align-items:center; justify-content:center; font-weight:700;">
+                ${patientName[0]}
+              </div>
+              <div>
+                <div class="doc-name">${patientName}</div>
+                <div style="font-size:11px; color:var(--gray-500);">${a.userData?.phone || a.userData?.email || ''}</div>
+              </div>
+            </div>
+          </td>
+          <td>
+            <div class="doc-avatar">
+              <img src="${docImg}" alt="" onerror="this.src='https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400&auto=format&fit=crop&q=80'">
+              <div class="doc-name">${doctorName}</div>
+            </div>
+          </td>
+          <td>${a.docData?.speciality || '—'}</td>
+          <td>
+            ${formatDate(a.slotDate)}<br>
+            <span style="color:var(--gray-500); font-size:12px;">${a.slotTime || ''}</span>
+          </td>
+          <td>${formatFee(a.amount)}</td>
+          <td>
+            <span class="badge badge-green">${a.payment ? 'Online (Paid)' : 'Pending'}</span>
+          </td>
+          <td>
+            <span class="badge badge-${a.status}">${a.status.toUpperCase()}</span>
+          </td>
+          <td>
+            ${a.status !== 'cancelled' ? `
+              <button class="btn-cancel" onclick="cancelAppointment(${a.id})" style="padding:4px 10px; font-size:11px;">Cancel</button>
+            ` : `<span style="color:var(--gray-400); font-size:12px;">Cancelled</span>`}
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function filterTable() {
+    const q = document.getElementById('search').value.toLowerCase().trim();
+    if (!q) {
+      renderTable(allAppts);
+      return;
+    }
+    const filtered = allAppts.filter(a => 
+      (a.userData?.name || '').toLowerCase().includes(q) ||
+      (a.docData?.name || '').toLowerCase().includes(q) ||
+      (a.docData?.speciality || '').toLowerCase().includes(q) ||
+      (a.status || '').toLowerCase().includes(q)
+    );
+    renderTable(filtered);
+  }
+
+  async function cancelAppointment(id) {
+    if (!confirm('Are you sure you want to cancel this appointment as Administrator?')) return;
+
+    const res = await api('PUT', `/api/admin/appointments/${id}/cancel`);
+    if (res.success) {
+      showToast('Appointment cancelled successfully', 'success');
+      loadAppointments();
+    } else {
+      showToast(res.message || 'Action failed', 'error');
+    }
+  }
+</script>
+
+</body>
+</html>
